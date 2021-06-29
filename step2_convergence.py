@@ -2,7 +2,7 @@ import numpy as np
 import functools
 import math
 
-from ema_workbench import (Constraint, RealParameter, ScalarOutcome, CategoricalParameter, ema_logging, MultiprocessingEvaluator)
+from ema_workbench import (Constraint, RealParameter, ScalarOutcome, CategoricalParameter, ema_logging, MultiprocessingEvaluator, SequentialEvaluator )
 
 from ema_workbench.connectors.vensim import VensimModel
 from ema_workbench.em_framework.parameters import Scenario
@@ -46,11 +46,11 @@ class MyVensimModel(VensimModel):
         results = super(MyVensimModel, self).run_experiment(experiment)
         nvars = len(decisions)
         # decisions = np.array(decisions)
-        results['Inertia'] = np.sum(np.abs(np.diff(decisions)) > 0.02)/float(nvars-1)
+        results['Inertia'] = np.sum(np.abs(np.diff(decisions)) > 0.1)/float(nvars-1) #0.1
         return results
 
 if __name__ == "__main__":
-    ema_logging.log_to_stderr(ema_logging.INFO)
+    ema_logging.log_to_stderr(ema_logging.INFO )
 
     wd = './Vensim models'
     vensimModel = MyVensimModel("simpleModel", wd=wd,
@@ -143,27 +143,26 @@ if __name__ == "__main__":
 
     vensimModel.levers = [RealParameter(f"Proposed harvesting quota {t}", 0, 6) for t in range(45)] #
 
-    vensimModel.outcomes = [ScalarOutcome('Average food provision by MF', variable_name='Food provision by MF', kind=ScalarOutcome.MAXIMIZE #namen veranderen naar wat de uitkomsten echt zijn (mean etc)
-                                    , function=np.mean),
+    vensimModel.outcomes = [ScalarOutcome('Average food provision by MF', variable_name='Food provision by MF',
+                                          kind=ScalarOutcome.MAXIMIZE, function=np.mean),
                             ScalarOutcome('Average vertical migration', variable_name='Total vertical migration', kind=ScalarOutcome.MAXIMIZE
                                    , function=np.mean),
                             ScalarOutcome('Biomass MF 10th percentile', variable_name='Biomass mesopelagic fish', kind=ScalarOutcome.MAXIMIZE
                                    , function=get_10_percentile),
                             ScalarOutcome('Final atmospheric C level', variable_name=['Atmospheric C', 'TIME'], kind=ScalarOutcome.MINIMIZE
                                           , function=get_last_outcome),
-                            ScalarOutcome('Inertia', kind=ScalarOutcome.MINIMIZE, function=np.mean)
-                            ]
+                            ScalarOutcome('Inertia', kind=ScalarOutcome.MINIMIZE)]
 
 
-    convergence_metrics = [HyperVolume(minimum=[ 8.504182e-04,5.113081e-02, 7.569002e-22, 7.328465e+01], maximum=[9.20419, 191.68451, 166.81265, 18067.49900]), EpsilonProgress()]
+    convergence_metrics =[EpsilonProgress()]
 
     with MultiprocessingEvaluator(vensimModel) as evaluator:
-        results, convergence = evaluator.optimize(nfe=1000, searchover='levers', convergence=convergence_metrics,
-                                      epsilons=[0.001,] * len(vensimModel.outcomes) , Scenario=ref_scen)
+        results, convergence = evaluator.optimize(nfe=800000, searchover='levers', convergence=convergence_metrics, #10
+                                      epsilons=[0.05,] * len(vensimModel.outcomes) , Scenario=ref_scen) #0.001 #0.1
 
 
-    results.to_excel('./Data/results_convergence7_inertia.xlsx')
-    convergence.to_excel('./Data/conv_convergence7_intertia.xlsx')
+    results.to_excel('./Data/results_convergence7_supercomp3.xlsx')
+    convergence.to_excel('./Data/conv_convergence7_supercomp3.xlsx')
 
 
 
